@@ -1,27 +1,26 @@
 #!/bin/bash
-# Build script for FKS shared builder base image
+# Build script for FKS shared docker base image
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-echo "Building FKS shared builder base image..."
+echo "Building FKS shared docker base image..."
 echo "Repository root: $REPO_ROOT"
 
 cd "$SCRIPT_DIR"
 
 # Build the base image
-docker build -t nuniesmith/fks:builder-base -f Dockerfile.builder .
+docker build -t nuniesmith/fks:docker -f Dockerfile.builder .
 
 echo ""
-echo "✅ Builder base image built successfully!"
+echo "✅ Docker base image built successfully!"
 echo ""
-echo "Image: nuniesmith/fks:builder-base"
+echo "Image: nuniesmith/fks:docker"
 echo ""
 echo "To push to registry:"
-echo "  docker push nuniesmith/fks:builder-base"
+echo "  docker push nuniesmith/fks:docker"
 echo ""
 echo "To use in services, update Dockerfiles to:"
-echo "  FROM nuniesmith/fks:builder-base AS builder"
-
+echo "  FROM nuniesmith/fks:docker AS builder"

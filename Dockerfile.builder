@@ -1,14 +1,14 @@
-# Shared Builder Base Image for FKS Services
+# Shared Docker Base Image for FKS Services
 # This image contains common build dependencies that multiple services need:
 # - TA-Lib C library (compiled)
 # - Common build tools (gcc, g++, make, cmake, etc.)
 # - Python build dependencies
 #
 # Usage:
-#   docker build -t nuniesmith/fks:builder-base -f docker-base/Dockerfile.builder .
-#   docker push nuniesmith/fks:builder-base
+#   docker build -t nuniesmith/fks:docker -f Dockerfile.builder .
+#   docker push nuniesmith/fks:docker
 #
-# Then services can use: FROM nuniesmith/fks:builder-base AS builder
+# Then services can use: FROM nuniesmith/fks:docker AS builder
 
 FROM python:3.12-slim AS builder-base
 

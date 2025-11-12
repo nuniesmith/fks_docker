@@ -13,14 +13,14 @@ The `Dockerfile.builder` creates a base image with:
 ### Building the Base Image
 
 ```bash
-cd repo/docker-base
-docker build -t nuniesmith/fks:builder-base -f Dockerfile.builder .
+cd repo/docker
+docker build -t nuniesmith/fks:docker -f Dockerfile.builder .
 ```
 
 ### Pushing to Registry
 
 ```bash
-docker push nuniesmith/fks:builder-base
+docker push nuniesmith/fks:docker
 ```
 
 ### Using in Services
@@ -29,7 +29,7 @@ Update your service Dockerfiles to use the base image:
 
 ```dockerfile
 # Instead of: FROM python:3.12-slim AS builder
-FROM nuniesmith/fks:builder-base AS builder
+FROM nuniesmith/fks:docker AS builder
 
 # TA-Lib is already installed, so skip that step
 # Just install Python dependencies
@@ -58,25 +58,25 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 Add to your GitHub Actions workflow:
 
 ```yaml
-- name: Build and push builder base
+- name: Build and push docker base
   if: github.event_name == 'push' && github.ref == 'refs/heads/main'
   run: |
-    docker build -t nuniesmith/fks:builder-base -f docker-base/Dockerfile.builder .
-    docker push nuniesmith/fks:builder-base
+    docker build -t nuniesmith/fks:docker -f Dockerfile.builder .
+    docker push nuniesmith/fks:docker
 ```
 
 Then services can pull it:
 ```yaml
-- name: Pull builder base
-  run: docker pull nuniesmith/fks:builder-base || true
+- name: Pull docker base
+  run: docker pull nuniesmith/fks:docker || true
 ```
 
 ## Versioning
 
 Tag the base image with versions:
 ```bash
-docker tag nuniesmith/fks:builder-base nuniesmith/fks:builder-base-v1.0.0
-docker push nuniesmith/fks:builder-base-v1.0.0
+docker tag nuniesmith/fks:docker nuniesmith/fks:docker-v1.0.0
+docker push nuniesmith/fks:docker-v1.0.0
 ```
 
 This allows services to pin to specific versions if needed.

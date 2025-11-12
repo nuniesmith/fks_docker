@@ -1,19 +1,15 @@
-name: Build and Push Builder Base Image
+name: Build and Push Docker Base Image
 
 on:
   push:
     branches: [main, develop]
-    paths:
-      - 'repo/docker-base/**'
-      - '.github/workflows/build-base.yml'
   pull_request:
     branches: [main]
-    paths:
-      - 'repo/docker-base/**'
   workflow_dispatch:
 
 env:
-  IMAGE_NAME: nuniesmith/fks:builder-base
+  IMAGE_NAME: nuniesmith/fks
+  IMAGE_TAG: docker
   DOCKER_USERNAME: nuniesmith
 
 jobs:
@@ -34,31 +30,25 @@ jobs:
           username: ${{ env.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=sha,prefix=sha-
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable={{is_default_branch}}
-
       - name: Build and push base image
         uses: docker/build-push-action@v6
         with:
-          context: repo/docker-base
-          file: repo/docker-base/Dockerfile.builder
+          context: .
+          file: Dockerfile.builder
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+            ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}-latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          labels: |
+            org.opencontainers.image.title=fks-docker
+            org.opencontainers.image.description=FKS Docker Base Image with TA-Lib and build tools
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
 
       - name: Image digest
-        run: echo ${{ steps.meta.outputs.digest }}
+        run: echo "Image pushed: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
 
   build-only:
     runs-on: ubuntu-latest
@@ -74,14 +64,13 @@ jobs:
       - name: Build base image (no push)
         uses: docker/build-push-action@v6
         with:
-          context: repo/docker-base
-          file: repo/docker-base/Dockerfile.builder
+          context: .
+          file: Dockerfile.builder
           push: false
-          tags: ${{ env.IMAGE_NAME }}
+          tags: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Image size
         run: |
-          docker images ${{ env.IMAGE_NAME }} --format "Base image size: {{.Size}}"
-
+          docker images ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} --format "Base image size: {{.Size}}"
