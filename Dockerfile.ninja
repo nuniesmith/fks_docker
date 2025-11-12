@@ -1,0 +1,67 @@
+# FKS Ninja Service - Python FastAPI Service
+# Uses CPU base image with TA-Lib and build tools pre-installed
+FROM nuniesmith/fks:docker AS builder
+
+WORKDIR /app
+
+# TA-Lib and build tools are already installed in base image
+# Just install service-specific packages
+COPY requirements.txt ./
+
+# Install Python dependencies with BuildKit cache mount
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m pip install --user --no-warn-script-location --no-cache-dir -r requirements.txt
+
+# Runtime stage
+FROM python:3.12-slim
+
+# Environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    SERVICE_NAME=fks_ninja \
+    SERVICE_PORT=8006 \
+    PYTHONPATH=/app/src:/app \
+    PATH=/home/appuser/.local/bin:$PATH \
+    NINJATRADER_HOST=100.80.141.117 \
+    NINJATRADER_PORT=8080 \
+    NINJATRADER_TIMEOUT=5
+
+WORKDIR /app
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN useradd -u 1000 -m -s /bin/bash appuser
+
+# Copy TA-Lib libraries from builder (needed at runtime)
+COPY --from=builder /usr/lib/libta_lib.so* /usr/lib/ || true
+
+# Copy Python packages from builder
+COPY --from=builder --chown=appuser:appuser /root/.local /home/appuser/.local
+
+# Copy application source
+COPY --chown=appuser:appuser src/ ./src/
+COPY --chown=appuser:appuser entrypoint.sh ./
+
+# Make entrypoint executable
+RUN chmod +x entrypoint.sh
+
+# Switch to non-root user
+USER appuser
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import os,urllib.request,sys;port=os.getenv('SERVICE_PORT','8006');u=f'http://localhost:{port}/health';\
+import urllib.error;\
+try: urllib.request.urlopen(u,timeout=3);\
+except Exception: sys.exit(1)" || exit 1
+
+# Expose the service port
+EXPOSE 8006
+
+# Use entrypoint script
+ENTRYPOINT ["./entrypoint.sh"]

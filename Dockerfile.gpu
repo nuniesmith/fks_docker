@@ -1,0 +1,81 @@
+# GPU-enabled Dockerfile for RAG/LLM services
+# Using multi-stage build with Python official image + CUDA runtime
+FROM python:3.13-slim AS python-base
+
+FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    CUDA_HOME=/usr/local/cuda \
+    PATH=/usr/local/cuda/bin:/usr/local/bin:$PATH \
+    LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+
+# Copy Python from official image
+COPY --from=python-base /usr/local/bin/python3.13 /usr/local/bin/python3.13
+COPY --from=python-base /usr/local/bin/python3 /usr/local/bin/python3
+COPY --from=python-base /usr/local/bin/pip3 /usr/local/bin/pip3
+COPY --from=python-base /usr/local/lib/python3.13 /usr/local/lib/python3.13
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    wget \
+    curl \
+    git \
+    build-essential \
+    libpq-dev \
+    postgresql-client \
+    libffi-dev \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create symlinks for python
+RUN ln -sf /usr/local/bin/python3.13 /usr/bin/python && \
+    ln -sf /usr/local/bin/pip3 /usr/bin/pip
+
+# Upgrade pip
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# Install PyTorch with CUDA support
+RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# Install CUDA-accelerated packages
+RUN pip install --no-cache-dir \
+    accelerate>=1.2.0 \
+    bitsandbytes>=0.45.0 \
+    sentence-transformers>=5.1.1 \
+    transformers>=4.47.0 \
+    xformers
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements first for better caching
+COPY requirements.gpu.txt ./
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.gpu.txt
+
+# Install Ollama (optional - can also run as separate service)
+RUN curl -fsSL https://ollama.com/install.sh | sh
+
+# Copy application code (contents of src to /app)
+COPY src/ /app/
+
+# Create log directories
+RUN mkdir -p /var/log/rag /var/log/gunicorn /app/logs
+
+# Health check script
+COPY <<EOF /usr/local/bin/healthcheck.sh
+#!/bin/bash
+curl -f http://localhost:8001/health || exit 1
+EOF
+
+RUN chmod +x /usr/local/bin/healthcheck.sh
+
+# Expose ports
+EXPOSE 8001 11434
+
+# Default command (can be overridden)
+CMD ["python", "-m", "src.rag.server"]

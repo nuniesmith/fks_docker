@@ -48,31 +48,31 @@ RUN set -e; \
     echo "=== Downloading TA-Lib ==="; \
     TA_LIB_DOWNLOADED=0; \
     if wget -q --timeout=30 --tries=2 -O /tmp/ta-lib.tar.gz https://github.com/TA-Lib/ta-lib/archive/refs/tags/v0.4.0.tar.gz 2>&1; then \
-        echo "Downloaded from GitHub mirror"; \
-        TA_LIB_DOWNLOADED=1; \
-        TA_LIB_DIR="ta-lib-0.4.0"; \
+    echo "Downloaded from GitHub mirror"; \
+    TA_LIB_DOWNLOADED=1; \
+    TA_LIB_DIR="ta-lib-0.4.0"; \
     elif wget -q --timeout=30 --tries=2 -O /tmp/ta-lib.tar.gz http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz 2>&1; then \
-        echo "Downloaded from SourceForge primary"; \
-        TA_LIB_DOWNLOADED=1; \
-        TA_LIB_DIR="ta-lib"; \
+    echo "Downloaded from SourceForge primary"; \
+    TA_LIB_DOWNLOADED=1; \
+    TA_LIB_DIR="ta-lib"; \
     elif curl -f -L --connect-timeout 30 --max-time 120 -o /tmp/ta-lib.tar.gz https://sourceforge.net/projects/ta-lib/files/ta-lib/0.4.0/ta-lib-0.4.0-src.tar.gz/download 2>&1; then \
-        echo "Downloaded from SourceForge via curl"; \
-        TA_LIB_DOWNLOADED=1; \
-        TA_LIB_DIR="ta-lib"; \
+    echo "Downloaded from SourceForge via curl"; \
+    TA_LIB_DOWNLOADED=1; \
+    TA_LIB_DIR="ta-lib"; \
     fi; \
     if [ "$TA_LIB_DOWNLOADED" -eq 0 ]; then \
-        echo "ERROR: All download methods failed"; \
-        exit 1; \
+    echo "ERROR: All download methods failed"; \
+    exit 1; \
     fi; \
     echo "=== Extracting TA-Lib ==="; \
     tar -xzf /tmp/ta-lib.tar.gz -C /tmp && rm -f /tmp/ta-lib.tar.gz; \
     cd /tmp/$TA_LIB_DIR; \
     echo "=== Configuring TA-Lib ==="; \
     if [ -f configure ]; then \
-        chmod +x configure; \
+    chmod +x configure; \
     elif [ -f configure.ac ] || [ -f configure.in ]; then \
-        autoreconf -fvi 2>&1 || ([ -f autogen.sh ] && chmod +x autogen.sh && ./autogen.sh 2>&1 || true); \
-        if [ -f configure ]; then chmod +x configure; else exit 1; fi; \
+    autoreconf -fvi 2>&1 || ([ -f autogen.sh ] && chmod +x autogen.sh && ./autogen.sh 2>&1 || true); \
+    if [ -f configure ]; then chmod +x configure; else exit 1; fi; \
     else exit 1; fi; \
     ./configure --prefix=/usr > /tmp/configure.log 2>&1 || (cat /tmp/configure.log && exit 1); \
     echo "=== Building TA-Lib ==="; \
@@ -90,7 +90,7 @@ RUN ldconfig && \
     ls -la /usr/lib/libta_lib.so* || echo "Warning: TA-Lib libraries not found"
 
 # Label the image
-LABEL maintainer="FKS Team" \
-      description="Shared builder base image with TA-Lib and build tools" \
-      version="1.0.0"
+LABEL maintainer="nuniesmith" \
+    description="Shared builder base image with TA-Lib and build tools" \
+    version="1.0.0"
 

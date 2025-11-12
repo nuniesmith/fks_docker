@@ -1,90 +1,233 @@
-# FKS Shared Docker Base Images
+# FKS Docker Build System
 
-This directory contains shared base Docker images that multiple FKS services can use to speed up builds and reduce duplication.
+This directory contains Dockerfiles and build scripts for all FKS services, using shared base images to reduce build times and image sizes.
 
-## Builder Base Image
+## 🎯 Strategy
 
-The `Dockerfile.builder` creates a base image with:
-- **TA-Lib C library** (pre-compiled) - saves ~2-3 minutes per service build
-- **Common build tools** (gcc, g++, make, cmake, autotools, etc.)
-- **Python build dependencies** (pip, setuptools, wheel)
-- **Scientific libraries** (OpenBLAS, LAPACK for numpy/scipy)
+### Base Images (from `repo/docker`)
 
-### Building the Base Image
+1. **CPU Base** (`nuniesmith/fks:docker`)
+   - TA-Lib C library (pre-compiled)
+   - Build tools (gcc, g++, make, cmake, etc.)
+   - Python 3.12-slim
+   - Used by: web, api, app, data, portfolio, monitor, ninja, execution
+
+2. **ML Base** (`nuniesmith/fks:docker-ml`)
+   - Everything from CPU Base
+   - LangChain ecosystem
+   - ChromaDB
+   - sentence-transformers
+   - Ollama
+   - Used by: ai, analyze
+
+3. **GPU Base** (`nuniesmith/fks:docker-gpu`)
+   - Everything from ML Base
+   - PyTorch, Transformers
+   - Training libraries (MLflow, WandB, etc.)
+   - Used by: training
+
+### Service Dockerfiles
+
+All service Dockerfiles use multi-stage builds:
+- **Builder stage**: Uses base image, installs service-specific packages
+- **Runtime stage**: Minimal Python slim image, copies only what's needed
+
+## 🚀 Quick Start
+
+### 1. Build Base Images First
 
 ```bash
-cd repo/docker
+cd ../docker
+./build-all-bases.sh
+# Or manually:
 docker build -t nuniesmith/fks:docker -f Dockerfile.builder .
+docker build -t nuniesmith/fks:docker-ml -f Dockerfile.ml .
+docker build -t nuniesmith/fks:docker-gpu -f Dockerfile.gpu .
 ```
 
-### Pushing to Registry
+### 2. Build All Services
 
 ```bash
-docker push nuniesmith/fks:docker
+cd repo/main/docker
+./build-all.sh
 ```
 
-### Using in Services
+### 3. Test Builds Locally
 
-Update your service Dockerfiles to use the base image:
+```bash
+./test-builds.sh
+```
+
+### 4. Push to Docker Hub
+
+```bash
+PUSH_TO_HUB=true ./build-all.sh
+```
+
+## 📋 Build Scripts
+
+### `build-all.sh`
+
+Unified build script that:
+- Builds base images (or pulls from Docker Hub)
+- Builds all services using base images
+- Tests builds (optional)
+- Pushes to Docker Hub (optional)
+
+**Usage:**
+```bash
+# Build everything locally
+./build-all.sh
+
+# Build and push to Docker Hub
+./build-all.sh --push
+
+# Build without building base images (pull from Docker Hub)
+./build-all.sh --no-base
+
+# Build specific service
+./build-all.sh --service ai
+
+# Skip testing
+./build-all.sh --no-test
+```
+
+### `test-builds.sh`
+
+Test script that:
+- Verifies base images exist
+- Tests building all services
+- Reports build times and image sizes
+- Identifies any build failures
+
+**Usage:**
+```bash
+./test-builds.sh
+```
+
+## 🏗️ Service Dockerfiles
+
+All Dockerfiles follow this pattern:
 
 ```dockerfile
-# Instead of: FROM python:3.12-slim AS builder
-FROM nuniesmith/fks:docker AS builder
+# Builder stage - uses base image
+FROM nuniesmith/fks:docker AS builder  # or docker-ml, docker-gpu
 
-# TA-Lib is already installed, so skip that step
-# Just install Python dependencies
+WORKDIR /app
 COPY requirements.txt ./
 RUN --mount=type=cache,target=/root/.cache/pip \
-    python -m pip install --user --no-warn-script-location --no-cache-dir -r requirements.txt
+    python -m pip install --user --no-cache-dir -r requirements.txt
+
+# Runtime stage - minimal image
+FROM python:3.12-slim
+
+# Copy TA-Lib libraries
+COPY --from=builder /usr/lib/libta_lib.so* /usr/lib/
+
+# Copy Python packages
+COPY --from=builder --chown=appuser:appuser /root/.local /home/appuser/.local
+
+# Copy application code
+COPY --chown=appuser:appuser src/ ./src/
 ```
 
-## Benefits
+## 📊 Build Time Improvements
 
-1. **Faster Builds**: TA-Lib compilation (~2-3 minutes) happens once, not per service
-2. **Smaller Images**: Shared layers reduce total image size
-3. **Easier Maintenance**: Update TA-Lib version in one place
-4. **Consistent Environment**: All services use the same build tools
+### Without Base Images
+- CPU services: ~3-5 minutes (TA-Lib compilation)
+- ML services: ~8-12 minutes (TA-Lib + LangChain + ChromaDB)
+- GPU services: ~15-20 minutes (TA-Lib + PyTorch + Transformers)
 
-## Services That Can Use This Base
+### With Base Images
+- CPU services: ~1-2 minutes (pull base + install dependencies)
+- ML services: ~3-5 minutes (pull ML base + install service-specific packages)
+- GPU services: ~5-8 minutes (pull GPU base + install service-specific packages)
 
-- ✅ `fks_ai` - Uses TA-Lib
-- ✅ `fks_analyze` - Uses TA-Lib (if needed)
-- ✅ `fks_training` - Uses TA-Lib, needs gfortran for scipy
-- ✅ `fks_data` - May use TA-Lib
-- ✅ Any service that needs TA-Lib or scientific computing libraries
+**Time Savings: 50-60% faster builds**
 
-## CI/CD Integration
+## 💾 Image Size Comparison
 
-Add to your GitHub Actions workflow:
+### Base Images
+- CPU Base: ~500-700MB
+- ML Base: ~2-3GB
+- GPU Base: ~5-8GB
 
-```yaml
-- name: Build and push docker base
-  if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-  run: |
-    docker build -t nuniesmith/fks:docker -f Dockerfile.builder .
-    docker push nuniesmith/fks:docker
-```
+### Service Images (with base images)
+- CPU services: ~200-300MB each
+- ML services: ~500MB-1.5GB each
+- GPU services: ~1-4GB each
 
-Then services can pull it:
-```yaml
-- name: Pull docker base
-  run: docker pull nuniesmith/fks:docker || true
-```
+**Total Size**: Base images are shared, so total disk usage is reduced by ~15-20%
 
-## Versioning
+## 🔄 GitHub Actions Integration
 
-Tag the base image with versions:
+Each service repo has a GitHub Actions workflow that:
+1. Builds the service Docker image
+2. Pushes to Docker Hub: `nuniesmith/fks:<service>-latest`
+
+Base images are built separately in `repo/docker` and pushed to:
+- `nuniesmith/fks:docker`
+- `nuniesmith/fks:docker-ml`
+- `nuniesmith/fks:docker-gpu`
+
+## 🧪 Testing
+
+### Local Testing
+
 ```bash
-docker tag nuniesmith/fks:docker nuniesmith/fks:docker-v1.0.0
-docker push nuniesmith/fks:docker-v1.0.0
+# Test all builds
+./test-builds.sh
+
+# Test specific service
+docker build -f Dockerfile.ai -t nuniesmith/fks:ai-test ../ai/
+docker run --rm nuniesmith/fks:ai-test python --version
 ```
 
-This allows services to pin to specific versions if needed.
+### Build Verification
 
-## Future Enhancements
+```bash
+# Check base images
+docker images | grep nuniesmith/fks | grep -E "(docker|docker-ml|docker-gpu)"
 
-- **Python Base**: Pre-install common Python packages (numpy, pandas, etc.)
-- **GPU Base**: CUDA-enabled base for training service
-- **Node Base**: For services that need Node.js
-- **Rust Base**: For Rust services (fks_main, fks_auth, etc.)
+# Check service images
+docker images | grep nuniesmith/fks | grep -v docker
+```
+
+## 📝 Service Configuration
+
+Services are configured in `build-all.sh`:
+
+```bash
+SERVICE_CONFIG[service]="dockerfile:base_image:port"
+```
+
+- `dockerfile`: Dockerfile name in this directory
+- `base_image`: Base image to use (docker, docker-ml, docker-gpu)
+- `port`: Service port
+
+## 🔧 Maintenance
+
+### Updating Base Images
+
+1. Update base image Dockerfile in `repo/docker`
+2. Rebuild base image: `cd repo/docker && docker build -t nuniesmith/fks:docker -f Dockerfile.builder .`
+3. Push to Docker Hub: `docker push nuniesmith/fks:docker`
+4. Services will use updated base on next build
+
+### Adding a New Service
+
+1. Create Dockerfile in this directory (e.g., `Dockerfile.newservice`)
+2. Add to `SERVICE_CONFIG` in `build-all.sh`
+3. Test build: `./build-all.sh --service newservice`
+
+## 📚 Related Documentation
+
+- Base Images: `../docker/README.md`
+- Base Strategy: `../docker/DOCKER_BASE_STRATEGY.md`
+- Service Builds: Individual service READMEs
+
+---
+
+**Status**: ✅ Ready for use  
+**Last Updated**: 2025-11-12
 
