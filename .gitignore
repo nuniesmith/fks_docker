@@ -1,0 +1,32 @@
+# Git ignore for Docker base repository
+
+# Build artifacts
+*.log
+*.tmp
+
+# Docker build cache
+.docker/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python (if any)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Node (if any)
+node_modules/
+npm-debug.log
+yarn-error.log
+

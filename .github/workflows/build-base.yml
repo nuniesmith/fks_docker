@@ -1,0 +1,87 @@
+name: Build and Push Builder Base Image
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'repo/docker-base/**'
+      - '.github/workflows/build-base.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'repo/docker-base/**'
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: nuniesmith/fks:builder-base
+  DOCKER_USERNAME: nuniesmith
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=sha-
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push base image
+        uses: docker/build-push-action@v6
+        with:
+          context: repo/docker-base
+          file: repo/docker-base/Dockerfile.builder
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Image digest
+        run: echo ${{ steps.meta.outputs.digest }}
+
+  build-only:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build base image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: repo/docker-base
+          file: repo/docker-base/Dockerfile.builder
+          push: false
+          tags: ${{ env.IMAGE_NAME }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Image size
+        run: |
+          docker images ${{ env.IMAGE_NAME }} --format "Base image size: {{.Size}}"
+
