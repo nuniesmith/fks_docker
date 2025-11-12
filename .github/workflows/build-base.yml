@@ -16,7 +16,7 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -36,9 +36,7 @@ jobs:
           context: .
           file: Dockerfile.builder
           push: true
-          tags: |
-            ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-            ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}-latest
+          tags: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }},${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}-latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
           labels: |
@@ -47,13 +45,15 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
 
-      - name: Image digest
-        run: echo "Image pushed: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
+      - name: Image info
+        run: |
+          echo "Image pushed: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
+          echo "Image pushed: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}-latest"
 
   build-only:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
