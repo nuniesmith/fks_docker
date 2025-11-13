@@ -2,14 +2,12 @@
 # Uses CPU base image with TA-Lib and build tools pre-installed
 FROM nuniesmith/fks:docker AS builder
 
-ARG SERVICE_DIR=./src/services/app
-
 # Set working directory
 WORKDIR /app
 
 # TA-Lib and build tools are already installed in base image
 # Just install service-specific packages
-COPY ${SERVICE_DIR}/requirements.txt .
+COPY requirements.txt .
 
 # Install Python dependencies with BuildKit cache mount
 RUN --mount=type=cache,target=/root/.cache/pip \
@@ -37,14 +35,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Create non-root user
 RUN useradd -u 1000 -m -s /bin/bash appuser
 
-# Copy TA-Lib libraries from builder (needed at runtime)
-COPY --from=builder /usr/lib/libta_lib.so* /usr/lib/ || true
+# Copy TA-Lib libraries from builder (needed at runtime) - optional
+RUN --mount=from=builder,source=/usr/lib,target=/tmp/ta-lib \
+    sh -c 'cp /tmp/ta-lib/libta_lib.so* /usr/lib/ 2>/dev/null || true' || true
 
 # Copy Python packages from builder
 COPY --from=builder --chown=appuser:appuser /root/.local /home/appuser/.local
 
 # Copy application code
-COPY --chown=appuser:appuser ${SERVICE_DIR}/src/ ./src/
+COPY --chown=appuser:appuser src/ ./src/
+COPY --chown=appuser:appuser entrypoint.sh* ./
+
+# Make entrypoint executable if it exists
+RUN if [ -f entrypoint.sh ]; then chmod +x entrypoint.sh; fi
 
 # Switch to non-root user
 USER appuser
@@ -59,5 +62,5 @@ import urllib.error;\
 try: urllib.request.urlopen(u,timeout=3);\
 except Exception: sys.exit(1)" || exit 1
 
-# Run FastAPI with uvicorn  
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8002"]
+# Use entrypoint if available, otherwise run uvicorn
+CMD ["/bin/sh", "-c", "if [ -f entrypoint.sh ]; then ./entrypoint.sh; else uvicorn src.main:app --host 0.0.0.0 --port 8002; fi"]

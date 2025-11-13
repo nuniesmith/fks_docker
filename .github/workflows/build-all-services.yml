@@ -61,7 +61,6 @@ jobs:
         with:
           repository: ${{ github.repository_owner }}/web
           path: web-repo
-          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         if: github.event_name != 'pull_request'
@@ -497,9 +496,67 @@ jobs:
           cache-from: type=gha,scope=main
           cache-to: type=gha,mode=max,scope=main
 
+  build-tailscale:
+    needs: ensure-base-images
+    runs-on: ubuntu-latest
+    if: github.event.inputs.service == '' || github.event.inputs.service == 'tailscale'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: docker-repo
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/tailscale
+          path: tailscale-repo
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        if: github.event_name != 'pull_request'
+        with:
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+      - name: Build and push tailscale
+        uses: docker/build-push-action@v6
+        with:
+          context: ./tailscale-repo
+          file: ./docker-repo/Dockerfile.tailscale
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ env.DOCKER_REPO }}:tailscale-latest
+          cache-from: type=gha,scope=tailscale
+          cache-to: type=gha,mode=max,scope=tailscale
+
+  build-nginx:
+    needs: ensure-base-images
+    runs-on: ubuntu-latest
+    if: github.event.inputs.service == '' || github.event.inputs.service == 'nginx'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: docker-repo
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/nginx
+          path: nginx-repo
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        if: github.event_name != 'pull_request'
+        with:
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+      - name: Build and push nginx
+        uses: docker/build-push-action@v6
+        with:
+          context: ./nginx-repo
+          file: ./docker-repo/Dockerfile.nginx
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ env.DOCKER_REPO }}:nginx-latest
+          cache-from: type=gha,scope=nginx
+          cache-to: type=gha,mode=max,scope=nginx
+
   build-summary:
     runs-on: ubuntu-latest
-    needs: [build-web, build-api, build-app, build-data, build-ai, build-analyze, build-training, build-portfolio, build-monitor, build-ninja, build-execution, build-auth, build-meta, build-main]
+    needs: [build-web, build-api, build-app, build-data, build-ai, build-analyze, build-training, build-portfolio, build-monitor, build-ninja, build-execution, build-auth, build-meta, build-main, build-tailscale, build-nginx]
     if: always()
     steps:
       - name: Build summary
@@ -519,6 +576,8 @@ jobs:
           echo "Auth: ${{ needs.build-auth.result }}"
           echo "Meta: ${{ needs.build-meta.result }}"
           echo "Main: ${{ needs.build-main.result }}"
+          echo "Tailscale: ${{ needs.build-tailscale.result }}"
+          echo "Nginx: ${{ needs.build-nginx.result }}"
           echo ""
           echo "All images: ${{ env.DOCKER_REPO }}:<service>-latest"
 

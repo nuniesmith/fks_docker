@@ -51,6 +51,8 @@ SERVICE_CONFIG[execution]="Dockerfile.execution:nuniesmith/fks:docker:8004"
 SERVICE_CONFIG[auth]="Dockerfile.auth:nuniesmith/fks:docker:8009"
 SERVICE_CONFIG[meta]="Dockerfile.meta:nuniesmith/fks:docker:8005"
 SERVICE_CONFIG[main]="Dockerfile.main:nuniesmith/fks:docker:8010"
+SERVICE_CONFIG[tailscale]="Dockerfile.tailscale:none:0"
+SERVICE_CONFIG[nginx]="Dockerfile.nginx:none:80"
 
 # Build base images
 build_base_images() {
@@ -141,15 +143,19 @@ build_service() {
     return 1
   fi
 
-  log_info "Building $service (using base: $base_image)..."
-  
-  # Check if base image exists locally
-  if ! docker image inspect "$base_image" &>/dev/null; then
-    log_warning "Base image $base_image not found locally, pulling..."
-    docker pull "$base_image" || {
-      log_error "Failed to pull base image $base_image"
-      return 1
-    }
+  if [ "$base_image" = "none" ]; then
+    log_info "Building $service (no FKS base image - using own base)..."
+  else
+    log_info "Building $service (using base: $base_image)..."
+    
+    # Check if base image exists locally
+    if ! docker image inspect "$base_image" &>/dev/null; then
+      log_warning "Base image $base_image not found locally, pulling..."
+      docker pull "$base_image" || {
+        log_error "Failed to pull base image $base_image"
+        return 1
+      }
+    fi
   fi
 
   local image_name="$DOCKER_USERNAME/$DOCKER_REPO:${service}-${DEFAULT_TAG}"

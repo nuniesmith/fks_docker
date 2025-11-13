@@ -36,8 +36,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Create non-root user
 RUN useradd -u 1000 -m -s /bin/bash appuser
 
-# Copy TA-Lib libraries from builder (needed at runtime)
-COPY --from=builder /usr/lib/libta_lib.so* /usr/lib/ || true
+# Copy TA-Lib libraries from builder (needed at runtime) - optional
+RUN --mount=from=builder,source=/usr/lib,target=/tmp/ta-lib \
+    sh -c 'cp /tmp/ta-lib/libta_lib.so* /usr/lib/ 2>/dev/null || true' || true
 
 # Copy Python packages from builder
 COPY --from=builder --chown=appuser:appuser /root/.local /home/appuser/.local
@@ -63,5 +64,5 @@ except Exception: sys.exit(1)" || exit 1
 EXPOSE 8011
 
 # Use entrypoint script if available, otherwise run directly
-CMD if [ -f entrypoint.sh ]; then ./entrypoint.sh; else python src/main.py; fi
+CMD ["/bin/sh", "-c", "if [ -f entrypoint.sh ]; then ./entrypoint.sh; else python src/main.py; fi"]
 
