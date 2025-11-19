@@ -6,17 +6,17 @@ on:
   workflow_dispatch:
     inputs:
       build_cpu:
-        description: 'Build CPU base'
+        description: "Build CPU base"
         required: false
         default: true
         type: boolean
       build_ml:
-        description: 'Build ML base'
+        description: "Build ML base"
         required: false
         default: true
         type: boolean
       build_gpu:
-        description: 'Build GPU base'
+        description: "Build GPU base"
         required: false
         default: true
         type: boolean
