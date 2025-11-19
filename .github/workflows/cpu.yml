@@ -1,18 +1,20 @@
-name: CI
+name: CPU Base Image
 
 on:
-    push:
-        branches: [main, develop]
-    pull_request:
-        branches: [main]
     workflow_dispatch:
+    push:
+        branches: [main]
+        paths:
+            - "Dockerfile.builder"
+    schedule:
+        - cron: "0 1 * * 0" # Sundays at 01:00 UTC
 
 jobs:
-    build-base-images:
+    build-cpu-only:
         uses: nuniesmith/fks_actions/.github/workflows/build-docker-base-images.yml@main
         with:
             docker_repo: nuniesmith/fks
-            build_cpu: false
+            build_cpu: true
             build_ml: false
             build_gpu: false
         secrets:

@@ -1,10 +1,7 @@
 name: Build and Push Docker Base Images
 
 on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main]
+  # Deprecated aggregator; keep manual-only to avoid duplicate builds.
   workflow_dispatch:
 
 env:

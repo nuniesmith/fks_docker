@@ -1,19 +1,21 @@
-name: CI
+name: ML Base Image
 
 on:
-    push:
-        branches: [main, develop]
-    pull_request:
-        branches: [main]
     workflow_dispatch:
+    push:
+        branches: [main]
+        paths:
+            - "Dockerfile.ml"
+    schedule:
+        - cron: "0 2 * * 0" # Sundays at 02:00 UTC
 
 jobs:
-    build-base-images:
+    build-ml-only:
         uses: nuniesmith/fks_actions/.github/workflows/build-docker-base-images.yml@main
         with:
             docker_repo: nuniesmith/fks
             build_cpu: false
-            build_ml: false
+            build_ml: true
             build_gpu: false
         secrets:
             DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
