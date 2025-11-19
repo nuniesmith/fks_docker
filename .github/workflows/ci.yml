@@ -1,0 +1,19 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-base-images:
+    uses: nuniesmith/fks_actions/.github/workflows/build-docker-base-images.yml@main
+    with:
+      docker_repo: nuniesmith/fks
+      build_cpu: true
+      build_ml: true
+      build_gpu: true
+    secrets:
+      DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
