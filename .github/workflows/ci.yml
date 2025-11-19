@@ -6,9 +6,34 @@ on:
     pull_request:
         branches: [main]
     workflow_dispatch:
+    schedule:
+        # Run CPU build at 1 AM UTC on Sundays (separate from ML and GPU)
+        - cron: "0 1 * * 0"
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
 
 jobs:
+    # Lint markdown documentation
+    lint-docs:
+        uses: nuniesmith/fks_actions/.github/workflows/docs-lint.yml@main
+        with:
+            docs_path: "**/*.md"
+            auto_fix: true
+
+    # Lint Dockerfiles and shell scripts
+    lint-code:
+        uses: nuniesmith/fks_actions/.github/workflows/code-lint.yml@main
+        with:
+            language: "python" # For shell script linting
+            source_paths: "scripts/"
+            run_mypy: false
+            auto_fix: false
+
+    # Build base images (disabled by default - use separate workflows)
     build-base-images:
+        if: github.event_name == 'workflow_dispatch'
         uses: nuniesmith/fks_actions/.github/workflows/build-docker-base-images.yml@main
         with:
             docker_repo: nuniesmith/fks
